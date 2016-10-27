@@ -18,23 +18,13 @@ class HttpClient private()(implicit executionContext: ExecutionContext) {
 
   def forUrl(url: String)(implicit executionContext: ExecutionContext) = new CallableHttpClient(url)
 
-  class CallableHttpClient private[HttpClient](url: String)(implicit executionContext: ExecutionContext) {
-
-    val client = HttpAsyncClients.createDefault()
-
-    def closeAfter[T](future: Future[T]): Future[T] = {
-      future.onComplete {
-        case _ => client.close()
-      }
-      future
-    }
+  class CallableHttpClient private[http](url: String)(implicit executionContext: ExecutionContext) {
 
     def get[T]()(implicit unmarshaller: Unmarshaller[T]): Future[T] = {
       val promise = Promise[T]()
-      client.start()
       val req = new HttpGet(url)
       client.execute(req, new Callback(unmarshaller, promise))
-      closeAfter(promise.future)
+      promise.future
     }
   }
 
