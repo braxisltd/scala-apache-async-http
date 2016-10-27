@@ -1,5 +1,6 @@
 package com.braxisltd.http
 
+import com.braxisltd.http.HttpClient.Callback
 import com.braxisltd.http.Unmarshallers.Unmarshaller
 import org.apache.http.HttpResponse
 import org.apache.http.client.methods.HttpGet
@@ -25,24 +26,25 @@ class HttpClient private(url: String)(implicit executionContext: ExecutionContex
     val promise = Promise[T]()
     client.start()
     val req = new HttpGet(url)
-    client.execute(
-      req,
-      new FutureCallback[HttpResponse] {
-        override def cancelled(): Unit = ???
-
-        override def completed(result: HttpResponse): Unit = {
-          promise.complete(Success(unmarshaller(result)))
-        }
-
-        override def failed(ex: Exception): Unit = ???
-      }
-    )
+    client.execute(req, new Callback(unmarshaller, promise))
     closeAfter(promise.future)
   }
 }
 
 object HttpClient {
   def forUrl(url: String)(implicit executionContext: ExecutionContext) = new HttpClient(url)
+
+  class Callback[T](unmarshaller: Unmarshaller[T], promise: Promise[T]) extends FutureCallback[HttpResponse] {
+    override def cancelled(): Unit = promise.failure(CallCancelledException)
+
+    override def completed(result: HttpResponse): Unit = {
+      promise.complete(Success(unmarshaller(result)))
+    }
+
+    override def failed(ex: Exception): Unit = promise.failure(ex)
+  }
+
+  object CallCancelledException extends Exception
 }
 
 object Unmarshallers {
