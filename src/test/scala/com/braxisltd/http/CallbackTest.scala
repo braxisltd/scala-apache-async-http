@@ -19,18 +19,18 @@ class CallbackTest extends FlatSpec with Matchers with MockitoSugar with ScalaFu
   trait Fixture {
     val unmarshalled = alphabetic10.next()
     val httpResponse = mock[HttpResponse]
-    val unmarshaller: HttpResponse => String = {
+    implicit val unmarshaller: HttpResponse => String = {
       case resp if resp == httpResponse => unmarshalled
     }
-    val promise = Promise[String]()
+    val promise = Promise[Response]()
     val future = promise.future
-    val callback = new Callback[String](unmarshaller, promise)
+    val callback = new Callback(promise)
   }
 
   "Callback" should "complete the promise upon complete" in new Fixture {
     callback.completed(httpResponse)
     whenReady(future) {
-      _ should be(unmarshalled)
+      _.entity[String] should be(unmarshalled)
     }
   }
 

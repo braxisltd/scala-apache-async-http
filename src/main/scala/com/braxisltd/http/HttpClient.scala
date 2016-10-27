@@ -20,10 +20,10 @@ class HttpClient private()(implicit executionContext: ExecutionContext) {
 
   class CallableHttpClient private[http](url: String)(implicit executionContext: ExecutionContext) {
 
-    def get[T]()(implicit unmarshaller: Unmarshaller[T]): Future[T] = {
-      val promise = Promise[T]()
+    def get(): Future[Response] = {
+      val promise = Promise[Response]()
       val req = new HttpGet(url)
-      client.execute(req, new Callback(unmarshaller, promise))
+      client.execute(req, new Callback(promise))
       promise.future
     }
   }
@@ -33,11 +33,11 @@ class HttpClient private()(implicit executionContext: ExecutionContext) {
 object HttpClient {
   def apply()(implicit executionContext: ExecutionContext) = new HttpClient()
 
-  class Callback[T](unmarshaller: Unmarshaller[T], promise: Promise[T]) extends FutureCallback[HttpResponse] {
+  class Callback(promise: Promise[Response]) extends FutureCallback[HttpResponse] {
     override def cancelled(): Unit = promise.failure(CallCancelledException)
 
     override def completed(result: HttpResponse): Unit = {
-      promise.complete(Success(unmarshaller(result)))
+      promise.complete(Success(new Response(result)))
     }
 
     override def failed(ex: Exception): Unit = promise.failure(ex)
@@ -45,6 +45,10 @@ object HttpClient {
 
   object CallCancelledException extends Exception
 
+}
+
+class Response(httpResponse:HttpResponse) {
+  def entity[T](implicit unmarshaller: Unmarshaller[T]): T = unmarshaller(httpResponse)
 }
 
 object Unmarshallers {
