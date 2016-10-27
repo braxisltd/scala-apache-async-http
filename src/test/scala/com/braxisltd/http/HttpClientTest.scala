@@ -64,11 +64,23 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
     val param1 = ("param1", "val1")
     val param2 = ("param1", "val2")
     val param3 = ("param2", "val3")
-    val url = stubForQueryParameters(param1, param2, param3)
+    val url = stubGetForQueryParameters(param1, param2, param3)
     val future = client.forUrl(url)
         .withParameter(param1._1, param1._2)
         .withParameter(param2._1, param2._2)
         .withParameter(param3._1, param3._2).get()
+    whenReady(future) {
+      _.status should be(200)
+    }
+  }
+
+  it should "pass request headers" in new Fixture {
+    val header1 = ("param1", "val1")
+    val header2 = ("param2", "val2")
+    val url = stubGetForRequestHeaders(header1, header2)
+    val future = client.forUrl(url)
+        .withHeader(header1._1, header1._2)
+        .withHeader(header2._1, header2._2).get()
     whenReady(future) {
       _.status should be(200)
     }
@@ -119,13 +131,25 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
       url(path)
     }
 
-    def stubForQueryParameters(parameters: (String, String)*):String = {
+    def stubGetForQueryParameters(parameters: (String, String)*): String = {
       val path = s"/${alpha.next()}"
       val stubMapping = parameters.foldLeft {
         get(urlPathEqualTo(path))
       } {
         (builder, param) =>
           builder.withQueryParam(param._1, equalTo(param._2))
+      }
+      server.stubFor(stubMapping.willReturn(aResponse()))
+      url(path)
+    }
+
+    def stubGetForRequestHeaders(headers: (String, String)*): String = {
+      val path = s"/${alpha.next()}"
+      val stubMapping = headers.foldLeft {
+        get(urlPathEqualTo(path))
+      } {
+        (builder, header) =>
+          builder.withHeader(header._1, equalTo(header._2))
       }
       server.stubFor(stubMapping.willReturn(aResponse()))
       url(path)

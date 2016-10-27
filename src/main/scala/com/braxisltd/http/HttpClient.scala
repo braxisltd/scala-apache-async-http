@@ -2,11 +2,12 @@ package com.braxisltd.http
 
 import com.braxisltd.http.HttpClient.Callback
 import com.braxisltd.http.Unmarshallers.Unmarshaller
-import org.apache.http.HttpResponse
+import org.apache.http.{Header, HttpResponse}
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.utils.URIBuilder
 import org.apache.http.concurrent.FutureCallback
 import org.apache.http.impl.nio.client.HttpAsyncClients
+import org.apache.http.message.BasicHeader
 import org.apache.http.util.EntityUtils
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -17,21 +18,31 @@ class HttpClient private()(implicit executionContext: ExecutionContext) {
   val client = HttpAsyncClients.createDefault()
   client.start()
 
-  def forUrl(url: String)(implicit executionContext: ExecutionContext) = new CallableHttpClient(url, Nil)
+  def forUrl(url: String)(implicit executionContext: ExecutionContext) = new CallableHttpClient(url, Nil, Nil)
 
-  class CallableHttpClient private[http](url: String, parameters: List[(String, String)])(implicit executionContext: ExecutionContext) {
-    def withParameter(name: String, value: String): CallableHttpClient = {
-      new CallableHttpClient(url, (name, value) :: parameters)
+  class CallableHttpClient private[http](url: String, parameters: List[(String, String)], headers: List[(String, String)])(implicit executionContext: ExecutionContext) {
+    def withHeader(name: String, value: String):CallableHttpClient = {
+      new CallableHttpClient(url, parameters, (name, value) :: headers)
     }
-    
+
+    def withParameter(name: String, value: String): CallableHttpClient = {
+      new CallableHttpClient(url, (name, value) :: parameters, headers)
+    }
+
     def get(): Future[Response] = {
       val promise = Promise[Response]()
       val uri = parameters.foldLeft(new URIBuilder(url)) {
-        (requestBuilder, parameter) =>
-          val (name, value) = parameter
+        case (requestBuilder, (name, value)) =>
           requestBuilder.addParameter(name, value)
       }
-      client.execute(new HttpGet(uri.build()), new Callback(promise))
+
+      val request = new HttpGet(uri.build())
+      headers.foreach {
+        case (name, value) =>
+          request.setHeader(name,value)
+      }
+
+      client.execute(request, new Callback(promise))
       promise.future
     }
   }
