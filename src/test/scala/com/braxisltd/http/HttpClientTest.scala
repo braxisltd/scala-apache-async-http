@@ -33,19 +33,19 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
 
   "HttpClient" should "return byte array" in new Fixture {
     val response = alpha.next().getBytes
-    val future = HttpClient.forUrl(stubSuccess(response)).get[Array[Byte]]()
+    val future = HttpClient().forUrl(stubSuccess(response)).get[Array[Byte]]()
     awaitEither(future).right.get.toList should be(response.toList)
   }
 
   it should "return string for utf-8" in new Fixture {
     val response = "!@€#£$%^&*?'`~"
-    val future = HttpClient.forUrl(stubSuccess(response, Charsets.UTF_8)).get[String]()
+    val future = HttpClient().forUrl(stubSuccess(response, Charsets.UTF_8)).get[String]()
     awaitEither(future) should be(Right(response))
   }
 
   it should "return string for iso-8859-15" in new Fixture {
     val response = "!@€#£$%^&*?'`~"
-    val future = HttpClient.forUrl(stubSuccess(response, Charset.forName("ISO-8859-15"))).get[String]()
+    val future = HttpClient().forUrl(stubSuccess(response, Charset.forName("ISO-8859-15"))).get[String]()
     awaitEither(future) should be(Right(response))
   }
 

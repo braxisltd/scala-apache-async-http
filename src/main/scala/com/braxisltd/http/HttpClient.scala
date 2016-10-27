@@ -11,28 +11,37 @@ import org.apache.http.util.EntityUtils
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Success
 
-class HttpClient private(url: String)(implicit executionContext: ExecutionContext) {
+class HttpClient private()(implicit executionContext: ExecutionContext) {
 
   val client = HttpAsyncClients.createDefault()
+  client.start()
 
-  def closeAfter[T](future: Future[T]): Future[T] = {
-    future.onComplete {
-      case _ => client.close()
+  def forUrl(url: String)(implicit executionContext: ExecutionContext) = new CallableHttpClient(url)
+
+  class CallableHttpClient private[HttpClient](url: String)(implicit executionContext: ExecutionContext) {
+
+    val client = HttpAsyncClients.createDefault()
+
+    def closeAfter[T](future: Future[T]): Future[T] = {
+      future.onComplete {
+        case _ => client.close()
+      }
+      future
     }
-    future
+
+    def get[T]()(implicit unmarshaller: Unmarshaller[T]): Future[T] = {
+      val promise = Promise[T]()
+      client.start()
+      val req = new HttpGet(url)
+      client.execute(req, new Callback(unmarshaller, promise))
+      closeAfter(promise.future)
+    }
   }
 
-  def get[T]()(implicit unmarshaller: Unmarshaller[T]): Future[T] = {
-    val promise = Promise[T]()
-    client.start()
-    val req = new HttpGet(url)
-    client.execute(req, new Callback(unmarshaller, promise))
-    closeAfter(promise.future)
-  }
 }
 
 object HttpClient {
-  def forUrl(url: String)(implicit executionContext: ExecutionContext) = new HttpClient(url)
+  def apply()(implicit executionContext: ExecutionContext) = new HttpClient()
 
   class Callback[T](unmarshaller: Unmarshaller[T], promise: Promise[T]) extends FutureCallback[HttpResponse] {
     override def cancelled(): Unit = promise.failure(CallCancelledException)
@@ -45,6 +54,7 @@ object HttpClient {
   }
 
   object CallCancelledException extends Exception
+
 }
 
 object Unmarshallers {
