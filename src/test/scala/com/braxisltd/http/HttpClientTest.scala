@@ -50,6 +50,17 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
     awaitEither(future).right.map(_.entity[String]) should be(Right(response))
   }
 
+  it should "response with status codes" in new Fixture {
+    val client = HttpClient()
+    (200 :: 302 :: 400 :: 503 :: Nil).foreach {
+      expectedStatusCode =>
+        val url = stubGetStatus(expectedStatusCode)
+        whenReady(client.forUrl(url).get()) {
+          _.status should be(expectedStatusCode)
+        }
+    }
+  }
+
   def awaitEither[T](future: Future[T], waitFor: Duration = 1.second): Either[Throwable, T] = {
     Await.result(
       future
@@ -85,6 +96,12 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
     def stubGetSuccessWithDelay(response: Array[Byte], timeout: Duration): String = {
       val path = s"/${alpha.next()}"
       server.stubFor(get(urlPathEqualTo(path)).willReturn(aResponse().withFixedDelay(timeout.toMillis.toInt).withBody(response)))
+      url(path)
+    }
+
+    def stubGetStatus(status: Int): String = {
+      val path = s"/${alpha.next()}"
+      server.stubFor(get(urlPathEqualTo(path)).willReturn(aResponse().withStatus(status)))
       url(path)
     }
   }

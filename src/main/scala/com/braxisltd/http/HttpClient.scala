@@ -47,8 +47,10 @@ object HttpClient {
 
 }
 
-class Response(httpResponse:HttpResponse) {
+class Response(httpResponse: HttpResponse) {
   def entity[T](implicit unmarshaller: Unmarshaller[T]): T = unmarshaller(httpResponse)
+
+  lazy val status = httpResponse.getStatusLine.getStatusCode
 }
 
 object Unmarshallers {
