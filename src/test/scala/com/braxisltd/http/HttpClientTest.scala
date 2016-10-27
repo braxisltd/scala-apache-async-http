@@ -86,6 +86,18 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
     }
   }
 
+  it should "return response headers" in new Fixture {
+    val header1 = ("header1", "val1")
+    val header2 = ("header2", "val2")
+    val url = stubGetWithResponseHeaders(header1, header2)
+
+    whenReady(client.forUrl(url).get()) {
+      response =>
+        response.headers should contain(header1)
+        response.headers should contain(header2)
+    }
+  }
+
   def awaitEither[T](future: Future[T], waitFor: Duration = 1.second): Either[Throwable, T] = {
     Await.result(
       future
@@ -152,6 +164,15 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
           builder.withHeader(header._1, equalTo(header._2))
       }
       server.stubFor(stubMapping.willReturn(aResponse()))
+      url(path)
+    }
+
+    def stubGetWithResponseHeaders(headers: (String, String)*): String = {
+      val path = s"/${alpha.next()}"
+      val stubResponse = headers.foldLeft(aResponse()) {
+        case (response, (name, value)) => response.withHeader(name, value)
+      }
+      server.stubFor(get(urlPathEqualTo(path)).willReturn(stubResponse))
       url(path)
     }
 

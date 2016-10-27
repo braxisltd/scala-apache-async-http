@@ -21,7 +21,7 @@ class HttpClient private()(implicit executionContext: ExecutionContext) {
   def forUrl(url: String)(implicit executionContext: ExecutionContext) = new CallableHttpClient(url, Nil, Nil)
 
   class CallableHttpClient private[http](url: String, parameters: List[(String, String)], headers: List[(String, String)])(implicit executionContext: ExecutionContext) {
-    def withHeader(name: String, value: String):CallableHttpClient = {
+    def withHeader(name: String, value: String): CallableHttpClient = {
       new CallableHttpClient(url, parameters, (name, value) :: headers)
     }
 
@@ -39,7 +39,7 @@ class HttpClient private()(implicit executionContext: ExecutionContext) {
       val request = new HttpGet(uri.build())
       headers.foreach {
         case (name, value) =>
-          request.setHeader(name,value)
+          request.setHeader(name, value)
       }
 
       client.execute(request, new Callback(promise))
@@ -67,9 +67,14 @@ object HttpClient {
 }
 
 class Response(httpResponse: HttpResponse) {
+
   def entity[T](implicit unmarshaller: Unmarshaller[T]): T = unmarshaller(httpResponse)
 
-  lazy val status = httpResponse.getStatusLine.getStatusCode
+  lazy val status: Int = httpResponse.getStatusLine.getStatusCode
+
+  lazy val headers: List[(String, String)] = httpResponse.getAllHeaders.toList.map {
+    header => (header.getName, header.getValue)
+  }
 }
 
 object Unmarshallers {
