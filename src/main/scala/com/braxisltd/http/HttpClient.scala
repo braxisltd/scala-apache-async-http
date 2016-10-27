@@ -4,6 +4,7 @@ import com.braxisltd.http.HttpClient.Callback
 import com.braxisltd.http.Unmarshallers.Unmarshaller
 import org.apache.http.HttpResponse
 import org.apache.http.client.methods.HttpGet
+import org.apache.http.client.utils.URIBuilder
 import org.apache.http.concurrent.FutureCallback
 import org.apache.http.impl.nio.client.HttpAsyncClients
 import org.apache.http.util.EntityUtils
@@ -16,14 +17,21 @@ class HttpClient private()(implicit executionContext: ExecutionContext) {
   val client = HttpAsyncClients.createDefault()
   client.start()
 
-  def forUrl(url: String)(implicit executionContext: ExecutionContext) = new CallableHttpClient(url)
+  def forUrl(url: String)(implicit executionContext: ExecutionContext) = new CallableHttpClient(url, Nil)
 
-  class CallableHttpClient private[http](url: String)(implicit executionContext: ExecutionContext) {
-
+  class CallableHttpClient private[http](url: String, parameters: List[(String, String)])(implicit executionContext: ExecutionContext) {
+    def withParameter(name: String, value: String): CallableHttpClient = {
+      new CallableHttpClient(url, (name, value) :: parameters)
+    }
+    
     def get(): Future[Response] = {
       val promise = Promise[Response]()
-      val req = new HttpGet(url)
-      client.execute(req, new Callback(promise))
+      val uri = parameters.foldLeft(new URIBuilder(url)) {
+        (requestBuilder, parameter) =>
+          val (name, value) = parameter
+          requestBuilder.addParameter(name, value)
+      }
+      client.execute(new HttpGet(uri.build()), new Callback(promise))
       promise.future
     }
   }

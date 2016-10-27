@@ -34,30 +34,43 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
 
   "HttpClient" should "return byte array" in new Fixture {
     val response = alpha.next().getBytes
-    val future = HttpClient().forUrl(stubGetSuccess(response)).get()
+    val future = client.forUrl(stubGetSuccess(response)).get()
     awaitEither(future).right.get.entity[Array[Byte]].toList should be(response.toList)
   }
 
   it should "return string for utf-8" in new Fixture {
     val response = "!@€#£$%^&*?'`~"
-    val future = HttpClient().forUrl(stubGetSuccess(response, Charsets.UTF_8)).get()
+    val future = client.forUrl(stubGetSuccess(response, Charsets.UTF_8)).get()
     awaitEither(future).right.map(_.entity[String]) should be(Right(response))
   }
 
   it should "return string for iso-8859-15" in new Fixture {
     val response = "!@€#£$%^&*?'`~"
-    val future = HttpClient().forUrl(stubGetSuccess(response, Charset.forName("ISO-8859-15"))).get()
+    val future = client.forUrl(stubGetSuccess(response, Charset.forName("ISO-8859-15"))).get()
     awaitEither(future).right.map(_.entity[String]) should be(Right(response))
   }
 
-  it should "response with status codes" in new Fixture {
-    val client = HttpClient()
+  it should "respond with status codes" in new Fixture {
     (200 :: 302 :: 400 :: 503 :: Nil).foreach {
       expectedStatusCode =>
         val url = stubGetStatus(expectedStatusCode)
         whenReady(client.forUrl(url).get()) {
           _.status should be(expectedStatusCode)
         }
+    }
+  }
+
+  it should "pass query parameters" in new Fixture {
+    val param1 = ("param1", "val1")
+    val param2 = ("param1", "val2")
+    val param3 = ("param2", "val3")
+    val url = stubForQueryParameters(param1, param2, param3)
+    val future = client.forUrl(url)
+        .withParameter(param1._1, param1._2)
+        .withParameter(param2._1, param2._2)
+        .withParameter(param3._1, param3._2).get()
+    whenReady(future) {
+      _.status should be(200)
     }
   }
 
@@ -77,6 +90,7 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
     import WireMock._
 
     val alpha = Generators.alphabetic10
+    val client = HttpClient()
 
     def url(path: String) = s"http://localhost:${server.port()}$path"
 
@@ -104,6 +118,19 @@ class HttpClientTest extends FlatSpec with Matchers with ScalaFutures with Befor
       server.stubFor(get(urlPathEqualTo(path)).willReturn(aResponse().withStatus(status)))
       url(path)
     }
+
+    def stubForQueryParameters(parameters: (String, String)*):String = {
+      val path = s"/${alpha.next()}"
+      val stubMapping = parameters.foldLeft {
+        get(urlPathEqualTo(path))
+      } {
+        (builder, param) =>
+          builder.withQueryParam(param._1, equalTo(param._2))
+      }
+      server.stubFor(stubMapping.willReturn(aResponse()))
+      url(path)
+    }
+
   }
 
 }
